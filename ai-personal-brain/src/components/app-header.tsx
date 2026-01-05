@@ -16,9 +16,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Separator } from "@/components/ui/separator"
+import { createClient } from "@/utils/supabase/client"
+import { useRouter } from "next/navigation"
 
 export function AppHeader() {
   const [searchQuery, setSearchQuery] = useState("")
+  const [user, setUser] = useState<any>(null)
+  const router = useRouter()
 
   const handleSearch = useCallback(
     (e: React.FormEvent) => {
@@ -28,6 +32,21 @@ export function AppHeader() {
     },
     [searchQuery],
   )
+
+  // Get user on mount
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setUser(user)
+    })
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null)
+    })
+
+    return () => subscription.unsubscribe()
+  }, [])
 
   // Keyboard shortcut for search focus
   useEffect(() => {
@@ -42,6 +61,13 @@ export function AppHeader() {
     window.addEventListener("keydown", handleKeyDown)
     return () => window.removeEventListener("keydown", handleKeyDown)
   }, [])
+
+  const handleLogout = async () => {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    router.push('/')
+    router.refresh()
+  }
 
   return (
     <header className="sticky top-0 z-50 flex h-14 items-center gap-4 border-b border-border bg-background px-4">
@@ -79,12 +105,16 @@ export function AppHeader() {
         <DropdownMenuContent align="end" className="w-56">
           <div className="flex items-center gap-2 p-2">
             <Avatar className="size-8">
-              <AvatarImage src="/diverse-user-avatars.png" alt="User" />
-              <AvatarFallback className="bg-primary text-primary-foreground text-xs">JD</AvatarFallback>
+              <AvatarImage src={user?.user_metadata?.avatar_url} alt="User" />
+              <AvatarFallback className="bg-primary text-primary-foreground text-xs">
+                {user?.email?.charAt(0).toUpperCase() || 'U'}
+              </AvatarFallback>
             </Avatar>
             <div className="flex flex-col space-y-0.5">
-              <p className="text-sm font-medium">John Doe</p>
-              <p className="text-xs text-muted-foreground">john@example.com</p>
+              <p className="text-sm font-medium">
+                {user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User'}
+              </p>
+              <p className="text-xs text-muted-foreground">{user?.email || 'Not logged in'}</p>
             </div>
           </div>
           <DropdownMenuSeparator />
@@ -97,7 +127,10 @@ export function AppHeader() {
             Settings
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem className="text-destructive focus:text-destructive">
+          <DropdownMenuItem 
+            className="text-destructive focus:text-destructive"
+            onClick={handleLogout}
+          >
             <LogOut className="mr-2 size-4" />
             Log out
           </DropdownMenuItem>

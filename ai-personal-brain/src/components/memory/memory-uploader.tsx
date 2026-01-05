@@ -24,6 +24,7 @@ import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
 import { Progress } from "@/components/ui/progress"
 import { cn } from "@/lib/utils"
+import { toast } from "sonner"
 
 interface UploadFile {
   id: string
@@ -157,29 +158,61 @@ export function MemoryUploader({ onUploadComplete }: MemoryUploaderProps) {
 
     for (let i = 0; i < files.length; i++) {
       const fileId = files[i].id
+      const file = files[i].file
 
       setFiles((prev) => prev.map((f) => (f.id === fileId ? { ...f, status: "uploading" as const } : f)))
 
-      // Simulate upload progress
-      for (let progress = 0; progress <= 100; progress += 10) {
-        await new Promise((resolve) => setTimeout(resolve, 50))
-        setFiles((prev) => prev.map((f) => (f.id === fileId ? { ...f, progress } : f)))
+      try {
+        // Read file content
+        const text = await file.text()
+        
+        // Update progress
+        setFiles((prev) => prev.map((f) => (f.id === fileId ? { ...f, progress: 50 } : f)))
+        setFiles((prev) => prev.map((f) => (f.id === fileId ? { ...f, status: "processing" as const } : f)))
+
+        // Call ingest API
+        const response = await fetch('/api/ingest', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            content: text,
+            metadata: {
+              title: file.name,
+              sourceName: sourceName || file.name,
+              tags: tags,
+              isPrivate: isPrivate,
+              fileName: file.name,
+              fileType: file.type,
+              fileSize: file.size
+            }
+          }),
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(errorData.error || 'Upload failed')
+        }
+
+        setFiles((prev) => prev.map((f) => (f.id === fileId ? { ...f, progress: 100, status: "complete" as const } : f)))
+        toast.success(`Successfully uploaded ${file.name}`)
+      } catch (error: any) {
+        console.error("Upload error:", error)
+        setFiles((prev) => prev.map((f) => 
+          (f.id === fileId ? { ...f, status: "error" as const, error: error.message } : f)
+        ))
+        toast.error(`Failed to upload ${file.name}: ${error.message}`)
       }
-
-      setFiles((prev) => prev.map((f) => (f.id === fileId ? { ...f, status: "processing" as const } : f)))
-
-      // Simulate processing
-      await new Promise((resolve) => setTimeout(resolve, 500))
-
-      setFiles((prev) => prev.map((f) => (f.id === fileId ? { ...f, status: "complete" as const } : f)))
     }
 
     setIsUploading(false)
 
-    onUploadComplete?.(
-      files.map((f) => f.file),
-      { sourceName, tags, isPrivate },
-    )
+    const successfulFiles = files.filter(f => f.status === "complete")
+    if (successfulFiles.length > 0) {
+      onUploadComplete?.(
+        successfulFiles.map((f) => f.file),
+        { sourceName, tags, isPrivate },
+      )
+    }
   }, [files, sourceName, tags, isPrivate, onUploadComplete])
 
   const allComplete = files.length > 0 && files.every((f) => f.status === "complete")

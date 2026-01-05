@@ -92,6 +92,12 @@ export function NoteEditor({ note, onSave, onAIAssist }: NoteEditorProps) {
     setSaveStatus("saving")
 
     saveTimeoutRef.current = setTimeout(() => {
+      console.log('NoteEditor: Triggering auto-save', { 
+        noteId: note?.id,
+        title,
+        contentLength: content?.length 
+      })
+      
       onSave({
         id: note?.id,
         title,

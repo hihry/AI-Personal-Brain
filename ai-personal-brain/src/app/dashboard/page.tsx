@@ -1,3 +1,4 @@
+"use client"
 import {
   Brain,
   FileText,
@@ -12,10 +13,12 @@ import {
   FileUp,
   MessagesSquare,
 } from "lucide-react"
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
+
 
 function getGreeting(): string {
   const hour = new Date().getHours()
@@ -115,8 +118,6 @@ const quickActions = [
   },
 ]
 
-export default function DashboardPage() {
-  const greeting = getGreeting()
 
   return (
     <div className="flex flex-col gap-8 p-6">
